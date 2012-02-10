@@ -12,7 +12,7 @@
 # Written by Samuel Williams and Henri Shustak
 # 
 
-# Version 1.7
+# Version 1.8
 
 
 
@@ -37,6 +37,7 @@
 # v1.5 last backup initiated time is accurate. Backups which start and stop due to a lock file are ignored.
 # v1.6 minor bug fixes.
 # v1.7 improved error reporting.
+# v1.8 additional details for full path reports.
 
 require 'fileutils'
 require 'optparse'
@@ -84,7 +85,7 @@ end
 
 # Internal Options
 
-# Backup initiated time limits.
+# Backup initiated time limits (time that may pass since last backup started before flagged as overdue).
 #   Note - This should be changed to a default and then the command line could be configured to overide this issue.
 #          More details on number of seconds in various divisions of time are availible at : http://www.epochconverter.com
 #          This feature may need to actually included in the backup configuration to allow per backup configuration.
@@ -102,9 +103,15 @@ logs_with_errors = 0
 @current_backup_initiation_time_successfully_determined_from_log_file="NO"
 
 def report_full_paths (path)
-    # reports some paths (hopefully absolute) for realivent files.
-	puts "  Configuration path : #{@config_paths[@line_reference]}"
-    puts "            Log path : #{path}"
+    # additional calcualtions for full path report output
+    backup_destination_path = `echo "source \\"#{@config_paths[@line_reference]}\\" ; echo \\${backupDest}" | bash`
+    if ( backup_destination_path == "" ) then 
+        backup_destination_path = "ERROR! : Unable to determin backup destination path, manual inspection of the configuration file is required."
+    end
+    # reports some paths (hopefully absolute) for realivent files and direcotries.
+	puts "       Configuration path : #{@config_paths[@line_reference]}"
+    puts "         Destination path : #{backup_destination_path}"
+    puts "                 Log path : #{path}"
 end
 
 def display_last_backup (path)
