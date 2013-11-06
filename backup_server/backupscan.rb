@@ -12,7 +12,7 @@
 # Written by Samuel Williams and Henri Shustak
 # 
 
-# Version 1.8
+# Version 1.9
 
 
 
@@ -38,6 +38,7 @@
 # v1.6 minor bug fixes.
 # v1.7 improved error reporting.
 # v1.8 additional details for full path reports.
+# v1.9 check for in backup in progress lock file to provide improved reporting.
 
 require 'fileutils'
 require 'optparse'
@@ -93,9 +94,11 @@ end
 
 #puts log_paths.inspect
 
-# Some varibles to keep track of the number of logs we check
+# Some varibles to keep track of the number of logs and backup directories we will be checking
 logs_checked = 0
 logs_with_errors = 0
+backups_in_progess = 0
+backup_lock_file_name = %x{cat /usr/local/sbin/lbackup | grep -e \"^backup_lock_file_name=\" | awk -F \"backup_lock_file_name=\\"\" '{print $2}' | awk -F \"\\"\" '{print $1}'}.chomp
 @line_reference = 0
 @backups_not_initiated_within_specified_limit = 0
 @current_ruby_time = Time.parse(`date`) # alterantivly you could use 'Time.now'
@@ -185,9 +188,17 @@ log_paths.each do |p|
         else
 			report_full_paths(p)
             display_last_backup(p)
-            puts "Backup log indicates error:"
+            log_path_parent_dir = File.dirname(p)
+            absolute_path_to_backup_lock_file = log_path_parent_dir + "/" + backup_lock_file_name
+            rsync_is_running = %x{ps -A | grep lbackup | grep "#{@config_paths[@line_reference]}" | grep -v \"grep\" | wc -l | awk '{print $1}'}
+            if ( ( File.exist?(absolute_path_to_backup_lock_file) ) && ( rsync_is_running != 0 ) ) then
+                puts "Backup appears to be in progress."
+                backups_in_progess+=1
+            else 
+                puts "Backup log indicates error:"
+                logs_with_errors+=1
+            end
             lines.each { |l| puts "\t#{l}"}
-            logs_with_errors+=1
         end
         logs_checked+=1
     end
@@ -198,7 +209,7 @@ end
 puts ""
 puts ""
 puts "=" * 72
-puts "Summary : #{logs_checked} log files scanned. #{logs_with_errors} logs with errors."
+puts "Summary : #{logs_checked} log files scanned. #{logs_with_errors} logs with errors. #{backups_in_progess} backups in progeess."
 if @backups_not_initiated_within_specified_limit > 0 then
    puts ""
    puts "          A total of #{@backups_not_initiated_within_specified_limit} backup(s) have not been initiated recently"
