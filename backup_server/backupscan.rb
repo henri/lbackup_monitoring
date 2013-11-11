@@ -12,7 +12,7 @@
 # Written by Samuel Williams and Henri Shustak
 # 
 
-# Version 1.9
+# Version 2.0
 
 
 
@@ -38,7 +38,8 @@
 # v1.6 minor bug fixes.
 # v1.7 improved error reporting.
 # v1.8 additional details for full path reports.
-# v1.9 check for in backup in progress lock file to provide improved reporting.
+# v1.9 check for in backup in progress lock file for improved reporting.
+# v2.0 include the count of backups exceeding limits within the error count.
 
 require 'fileutils'
 require 'optparse'
@@ -182,6 +183,8 @@ log_paths.each do |p|
             display_last_backup(p)
             if "#{@current_backup_initiation_time_exceeds_specified_limit}" == "YES" then
                 puts "Backup appears to be successful. However, last backup was too long ago."
+                # This next line will incriment the error count when the backup time limit is exceeded.
+                logs_with_errors+=1
             else
                 puts "Backup appears to be successful."
             end
@@ -213,7 +216,7 @@ puts "Summary : #{logs_checked} log files scanned. #{logs_with_errors} logs with
 if @backups_not_initiated_within_specified_limit > 0 then
    puts ""
    puts "          A total of #{@backups_not_initiated_within_specified_limit} backup(s) have not been initiated recently"
-   puts "          enough to comply with specified limits."
+   puts "          enough to comply with specified limits, these contribute to the count of backups with errors."
    puts ""
 end
 puts "=" * 72
