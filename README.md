@@ -12,7 +12,10 @@ Details regarding source for the LBackup project on GitHub is also available :
 Further information including basic and more advanced usage is available from the following URL: 
 <http://www.lbackup.org>
 
-To have a backup summary emailed to you on a regular basis you could use a tools such as sendEmail <http://caspian.dotconf.net/menu/Software/SendEmail/> and CRON <http://en.wikipedia.org/wiki/Cron> to schdule delivery of the report summary to you on a regular basis.
+To have a backup summary emailed to you on a regular basis you could use a tools such as [sendEmail][1] and [CRON][2]  to schdule delivery of the report summary to you on a regular basis. For addiitonal information visit the following URL : 
+<http://www.lbackup.org/reporting#log_delivery_via_email>
 
 Comments and suggestions regarding the LBackup project as well as these monitoring packages are very welcome.
 
+	[1]: http://caspian.dotconf.net/menu/Software/SendEmail/
+	[2]: http://en.wikipedia.org/wiki/Cron
