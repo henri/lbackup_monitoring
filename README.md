@@ -17,5 +17,5 @@ To have a backup summary emailed to you on a regular basis you could use a tools
 
 Comments and suggestions regarding the LBackup project as well as these monitoring packages are very welcome.
 
-	[1]: http://caspian.dotconf.net/menu/Software/SendEmail/
-	[2]: http://en.wikipedia.org/wiki/Cron
+   [1]: http://caspian.dotconf.net/menu/Software/SendEmail/
+   [2]: http://en.wikipedia.org/wiki/Cron
