@@ -12,7 +12,7 @@
 # Written by Samuel Williams and Henri Shustak
 # 
 
-# Version 2.0
+# Version 2.1
 
 
 
@@ -21,12 +21,29 @@
 # This script is to be installed onto a backup server. It is designed scan
 # LBackup log files and report errors found within these log files.
 #
-# A text file called "backuploglist.txt" then needs to be created within the
+# A text file called "backuploglist.txt" then needs to be created within the
 # same directory as backupscan. This file should then be loaded with the log
 # files to be scanned. At this point you may run the script to query this 
 # server for a summary of the backup logs which were in the text file.
 # This process may be automated by a centralized server which checks multiple
 # servers and presents the results in a palatable format.
+# Later versions of this script require a second list of assosiated
+# configuration files. The line numbers in these two files are assumed to
+# corrispond with each other.
+#
+# Known issues : 
+#    (1) This script is compatible with ruby 1.8 later versions of ruby
+#        may not support the option parsing appraoch used within this script 
+#        Ruby 2.1 should resolve this problem.
+#    (2) If a backup is always in progress during a scan, then it is possible
+#        for a backup to have not been completed within the limits.
+#        The fix for this will be to check the previous backup initiation
+#        when a backup is in progress and use this previous start point as
+#        as a check for the time since the last completed backup. Then if this
+#        time exceeds the limits specified an error could be flagged. THus avoiding
+#        This issue.
+#    (3) The logic could be improved to greatly reduce the number of lines of code.
+#
 
 # Version Changes
 # 
@@ -34,12 +51,13 @@
 # v1.2 various fixes.
 # v1.3 adds details the date of the last backup to the output.
 # v1.4 adds a check for backups which have not taken place within a set period.
-# v1.5 last backup initiated time is accurate. Backups which start and stop due to a lock file are ignored.
+# v1.5 last backup initiated time is accurate, backups which start and stop due to a lock file are ignored.
 # v1.6 minor bug fixes.
 # v1.7 improved error reporting.
 # v1.8 additional details for full path reports.
 # v1.9 check for in backup in progress lock file for improved reporting.
 # v2.0 include the count of backups exceeding limits within the error count.
+# v2.1 includes checks which work with LBackup 0.9.8r5 and later for checking the backup run duration.
 
 require 'fileutils'
 require 'optparse'
@@ -49,6 +67,7 @@ OPTIONS = {
   :log_list => "backuploglist.txt",
   :config_list => "backupconfiglist.txt",
 }
+
 
 ARGV.options do |o|
   script_name = File.basename($0)
@@ -88,10 +107,17 @@ end
 # Internal Options
 
 # Backup initiated time limits (time that may pass since last backup started before flagged as overdue).
-#   Note - This should be changed to a default and then the command line could be configured to overide this issue.
+#   Note - This should be changed to a default and then the command line could be configured to overide.
 #          More details on number of seconds in various divisions of time are availible at : http://www.epochconverter.com
 #          This feature may need to actually included in the backup configuration to allow per backup configuration.
 @max_number_of_seconds_since_previous_backup_initiated = "604800" # 86400 seconds is one day. 604800 is one week.
+
+
+# Backup duration time limits (time that a backup may run for before being flagged as taking too long).
+#   Note - This should be changed to a default and then the command line could be configured to overide.
+#          More details on number of seconds in various divisions of time are availible at : http://www.epochconverter.com
+#          This feature may need to actually included in the backup configuration to allow per backup configuration.
+@max_number_of_seconds_for_backup_duration = "302400" # 302400 seconds is 12 hours. 151200 is 6 hours.
 
 #puts log_paths.inspect
 
@@ -99,12 +125,18 @@ end
 logs_checked = 0
 logs_with_errors = 0
 backups_in_progess = 0
-backup_lock_file_name = %x{cat /usr/local/sbin/lbackup | grep -e \"^backup_lock_file_name=\" | awk -F \"backup_lock_file_name=\\"\" '{print $2}' | awk -F \"\\"\" '{print $1}'}.chomp
+backup_lock_file_name = %x{cat /usr/local/sbin/lbackup | grep -e "^backup_lock_file_name=" }.split("\"")[1].chomp
 @line_reference = 0
 @backups_not_initiated_within_specified_limit = 0
+@backups_duration_exceeding_specified_limit = 0
 @current_ruby_time = Time.parse(`date`) # alterantivly you could use 'Time.now'
-@current_backup_initiation_time_exceeds_specified_limit="NO"
-@current_backup_initiation_time_successfully_determined_from_log_file="NO"
+@current_backup_initiation_time_exceeds_specified_limit = "NO"
+@current_backup_initiation_time_successfully_determined_from_log_file = "NO"
+@current_backup_duration_exceeds_specified_limit = "NO"
+@current_backup_duration_successfully_determined = "NO"
+@current_backup_duration_unable_to_detemrin_duration_message = ""
+@current_backup_duration_exceeded_message = ""
+@current_backup_duration_in_seconds = 0
 
 def report_full_paths (path)
     # additional calcualtions for full path report output
@@ -117,6 +149,7 @@ def report_full_paths (path)
     puts "         Destination path : #{backup_destination_path}"
     puts "                 Log path : #{path}"
 end
+
 
 def display_last_backup (path)
    # provides reporting of information regarding the last backup.
@@ -152,7 +185,7 @@ def display_last_backup (path)
    puts "Backup initiated at : #{last_backup_date}"
    last_backup_ruby_time = Time.parse(last_backup_date)
    seconds_since_last_backup = @current_ruby_time.to_i - last_backup_ruby_time.to_i
-   if seconds_since_last_backup > @max_number_of_seconds_since_previous_backup_initiated.to_i then
+   if seconds_since_last_backup.to_i > @max_number_of_seconds_since_previous_backup_initiated.to_i then
        @backups_not_initiated_within_specified_limit = @backups_not_initiated_within_specified_limit + 1
        @current_backup_initiation_time_exceeds_specified_limit="YES"
        mm, ss = seconds_since_last_backup.divmod(60)
@@ -160,11 +193,82 @@ def display_last_backup (path)
        dd, hh = hh.divmod(24)
        puts "                      %d days, %d hours, %d minutes ago" % [dd, hh, mm, ss]
    end
-   if @current_backup_initiation_time_successfully_determined_from_log_file == "NO" then
-      @backups_not_initiated_within_specified_limit = @backups_not_initiated_within_specified_limit + 1
-      @current_backup_initiation_time_exceeds_specified_limit="YES"
-   end
 end
+
+
+def check_if_backup_duration_exceeeds_specified_limit
+  if @current_backup_duration_in_seconds > @max_number_of_seconds_for_backup_duration.to_i then
+    @current_backup_duration_exceeds_specified_limit = "YES"
+    @backups_duration_exceeding_specified_limit = @backups_duration_exceeding_specified_limit + 1
+    return -1
+  else
+    @current_backup_duration_exceeds_specified_limit = "NO"
+    return 0
+  end
+end
+
+
+def check_log_for_last_succesful_backup_duration_entry (lines)
+  # look into the log file two lines up and check the reported "Time elapsed in seconds"
+  # if the backup is not succesfull or is in progress then this function will not be called.
+  # Max number of seconds has a limit set (eg. is not set to zero)
+  if lines[-2].match(/^Time elapsed in seconds /).to_s.length > 0 then
+    elapsed_time_recorded_within_log_file=lines[-2].match(/\d+/)
+	if ( ( elapsed_time_recorded_within_log_file.to_s.to_i >= 1 ) && ( elapsed_time_recorded_within_log_file.to_s != "" ) && ( lines[-2].to_s != "WARNING! : Unable to calculate the total time required for sucesfull backup.")) then
+	  @current_backup_duration_in_seconds = elapsed_time_recorded_within_log_file.to_s.to_i
+	  if ( @current_backup_duration_in_seconds.is_a? Integer ) then
+	    @current_backup_duration_successfully_determined = "YES"
+	    @current_backup_duration_exceeded_message = "Backup appears to be successful. However, the last backup was in progress for too long."
+		return check_if_backup_duration_exceeeds_specified_limit
+	  end
+	end
+  end
+  @current_backup_duration_unable_to_detemrin_duration_message = "WARNING! : Unable to determine elapsed time for last succesful backup from the log file."
+  @current_backup_duration_successfully_determined = "NO"
+  @current_backup_duration_exceeds_specified_limit = "YES"
+  @backups_duration_exceeding_specified_limit = @backups_duration_exceeding_specified_limit + 1
+  return -1
+end
+
+
+def check_in_progress_backup_duration (absolute_path_to_backup_lock_file)
+  # rather than using ps to find the process start time or the creation time on the lock file,
+  # we will rely upon the time data stored within the lock file.
+  @current_backup_duration_successfully_determined = "YES"
+  start_time_since_epoch = %x{cat \"#{absolute_path_to_backup_lock_file}\" | head -n 1 | tail -n 1 | awk -F \" : \" '{print $2}'}.chomp.to_i
+  if ( start_time_since_epoch <= 0 || start_time_since_epoch.to_s == "" ) then
+    @current_backup_duration_unable_to_detemrin_duration_message = "WARNING! : Unable to detemin backup in progress backup start time by examining the lock file."
+    @current_backup_duration_successfully_determined = "NO"
+    @backups_duration_exceeding_specified_limit = @backups_duration_exceeding_specified_limit + 1
+    return -1
+  end
+  if ( start_time_since_epoch.is_a? Integer ) then
+    current_backup_duration_in_seconds = @current_ruby_time.to_i - start_time_since_epoch.to_i
+    if ( @current_backup_duration_in_seconds.to_i <= 0 || @current_backup_duration_in_seconds.to_s == "" ) then
+      @current_backup_duration_unable_to_detemrin_duration_message = "WARNING! : Unable to calculate the in progress backup duration by examining the lock file."
+      @current_backup_duration_successfully_determined = "NO"
+      @current_backup_duration_exceeds_specified_limit = "YES"
+      return -2
+    end
+    if (( current_backup_duration_in_seconds.is_a? Integer ) && ( current_backup_duration_in_seconds.to_i >= 1 )) then
+      @current_backup_duration_in_seconds = current_backup_duration_in_seconds
+      @current_backup_duration_successfully_determined = "YES"
+      @current_backup_duration_exceeded_message = "Backup appears to be in progress. Also, this backup has been in progress for too long."
+      return check_if_backup_duration_exceeeds_specified_limit
+    else
+      @current_backup_duration_unable_to_detemrin_duration_message = "WARNING! :  Unable to calculate the in progress backup duration by examining the lock file."
+      @current_backup_duration_successfully_determined = "NO"
+      @current_backup_duration_exceeds_specified_limit = "YES"
+      return -3
+    end
+  else
+    @current_backup_duration_unable_to_detemrin_duration_message = "WARNING : Unable to calculate the in progress backup duration by examining the lock file."
+    @current_backup_duration_successfully_determined = "NO"
+    @current_backup_duration_exceeds_specified_limit = "YES"
+    return -4
+  end
+end
+
 
 log_paths.each do |p|
     unless p.match(/^\s*(#.*)?$/) # Do not deal with lines that commented out or blank
@@ -172,7 +276,7 @@ log_paths.each do |p|
         puts "Inspecting most recent backup log #{File.basename(p)}"
         lines = `tail -n 50 #{p}`.strip.split(/\r|\n/).delete_if {|l| l.length == 0 } 
         if lines.size == 0
-			report_full_paths(p)
+			      report_full_paths(p)
             if File.readable?(p) then 
                 puts "WARNING! : Backup log is empty."
             else
@@ -180,13 +284,26 @@ log_paths.each do |p|
             end
             logs_with_errors+=1
         elsif lines[-1].match /Backup Completed Successfully/
+	        check_log_for_last_succesful_backup_duration_entry(lines)
             display_last_backup(p)
             if "#{@current_backup_initiation_time_exceeds_specified_limit}" == "YES" then
-                puts "Backup appears to be successful. However, last backup was too long ago."
-                # This next line will incriment the error count when the backup time limit is exceeded.
+                puts "Backup appears to be successful. However, last backup was started to long ago."
+                # This next line will incriment the error count when the backup initiation time limit is exceeded.
                 logs_with_errors+=1
             else
-                puts "Backup appears to be successful."
+                # If the backup was started too long ago this is not going to be reported due to the else. One error is enough to flag up a problem at this point.
+                if @current_backup_duration_exceeds_specified_limit.to_s == "YES" then
+                  if @current_backup_duration_successfully_determined == "NO" then
+     				  puts "#{@current_backup_duration_unable_to_detemrin_duration_message}"
+     				  puts "Backup appears to be successful." 
+                  else
+                      puts "#{@current_backup_duration_exceeded_message}"
+                  end
+                  # This next line will increment the error count when the backup duration time limit is exceeded.
+                  logs_with_errors+=1
+                else
+                  puts "Backup appears to be successful." 
+                end
             end
         else
 			report_full_paths(p)
@@ -195,17 +312,28 @@ log_paths.each do |p|
             absolute_path_to_backup_lock_file = log_path_parent_dir + "/" + backup_lock_file_name
             rsync_is_running = %x{ps -A | grep lbackup | grep "#{@config_paths[@line_reference]}" | grep -v \"grep\" | wc -l | awk '{print $1}'}
             if ( ( File.exist?(absolute_path_to_backup_lock_file) ) && ( rsync_is_running != 0 ) ) then
-                puts "Backup appears to be in progress."
+                check_in_progress_backup_duration(absolute_path_to_backup_lock_file)
+                if @current_backup_duration_exceeds_specified_limit.to_s == "YES" then
+                  if @current_backup_duration_successfully_determined == "NO" then
+     				  puts "#{@current_backup_duration_unable_to_detemrin_duration_message}"
+     				  puts "Backup appears to be in progress."
+                  else
+                      puts "#{@current_backup_duration_exceeded_message}"
+                  end
+                  logs_with_errors+=1
+                else
+                  puts "Backup appears to be in progress."
+                end
                 backups_in_progess+=1
-            else 
+             else 
                 puts "Backup log indicates error:"
                 logs_with_errors+=1
-            end
-            lines.each { |l| puts "\t#{l}"}
-        end
-        logs_checked+=1
+             end
+         end
+         logs_checked+=1
     end
-    @current_backup_initiation_time_exceeds_specified_limit="NO"
+    @current_backup_initiation_time_exceeds_specified_limit = "NO"
+    @current_backup_duration_exceeds_specified_limit = "NO"
 	@line_reference+=1
 end
 
@@ -215,10 +343,19 @@ puts "=" * 72
 puts "Summary : #{logs_checked} log files scanned. #{logs_with_errors} logs with errors. #{backups_in_progess} backups in progeess."
 if @backups_not_initiated_within_specified_limit > 0 then
    puts ""
-   puts "          A total of #{@backups_not_initiated_within_specified_limit} backup(s) have not been initiated recently"
-   puts "          enough to comply with specified limits, these contribute to the count of backups with errors."
+   puts "          A total of #{@backups_not_initiated_within_specified_limit} backup(s) have not been"
+   puts "          initiated recently enough to comply with specified limits," 
+   puts "          these contribute to the count of backups with errors."
    puts ""
 end
+if @backups_duration_exceeding_specified_limit > 0 then
+    puts ""
+    puts "          A total of #{@backups_duration_exceeding_specified_limit} backup(s) are exceeding the specified"
+    puts "          limits for backup duration time, these contribute"
+    puts "          to the count of backups with errors."
+    puts ""
+end
+
 puts "=" * 72
 puts ""
 puts ""
