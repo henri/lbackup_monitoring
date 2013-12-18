@@ -291,14 +291,14 @@ def check_log_for_last_succesful_backup_duration_entry (lines)
   # Max number of seconds has a limit set (eg. is not set to zero)
   if lines[-2].match(/^Time elapsed in seconds /).to_s.length > 0 then
     elapsed_time_recorded_within_log_file=lines[-2].match(/\d+/)
-	if ( ( elapsed_time_recorded_within_log_file.to_s.to_i >= 1 ) && ( elapsed_time_recorded_within_log_file.to_s != "" ) && ( lines[-2].to_s != "WARNING! : Unable to calculate the total time required for sucesfull backup.")) then
-	  @current_backup_duration_in_seconds = elapsed_time_recorded_within_log_file.to_s.to_i
-	  if ( @current_backup_duration_in_seconds.is_a? Integer ) then
-	    @current_backup_duration_successfully_determined = "YES"
-	    @current_backup_duration_exceeded_message = "Backup appears to be successful. However, the last backup was in progress for too long."
-		return check_if_backup_duration_exceeeds_specified_limit
+	  if ( ( elapsed_time_recorded_within_log_file.to_s.to_i >= 1 ) && ( elapsed_time_recorded_within_log_file.to_s != "" ) && ( lines[-2].to_s != "WARNING! : Unable to calculate the total time required for sucesfull backup.")) then
+	    @current_backup_duration_in_seconds = elapsed_time_recorded_within_log_file.to_s.to_i
+	    if ( @current_backup_duration_in_seconds.is_a? Integer ) then
+	      @current_backup_duration_successfully_determined = "YES"
+	      @current_backup_duration_exceeded_message = "Backup appears to be successful. However, the last backup was in progress for too long."
+		    return check_if_backup_duration_exceeeds_specified_limit
+	    end
 	  end
-	end
   end
   @current_backup_duration_unable_to_detemrin_duration_message = "WARNING! : Unable to determine elapsed time for last succesful backup from the log file."
   @current_backup_duration_successfully_determined = "NO"
