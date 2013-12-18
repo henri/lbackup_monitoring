@@ -21,6 +21,9 @@
 # This script is to be installed onto a backup server. It is designed scan
 # LBackup log files and report errors found within these log files.
 #
+# Additional information relting to this script is availible from the following URL : 
+# http://www.lbackup.org/monitoring_multiple_backup_logs#backupscanrb
+#
 # A text file called "backuploglist.txt" then needs to be created within the
 # same directory as backupscan. This file should then be loaded with the log
 # files to be scanned. At this point you may run the script to query this 
@@ -196,7 +199,7 @@ def check_and_display_last_backup (path)
            @current_backup_initiation_time_successfully_determined_from_log_file = "NO"
        end
    end
-   puts "Most recent backup initiated at : #{last_backup_date}"
+   puts "Most recent backup initiated : #{last_backup_date}"
    last_backup_ruby_time = Time.parse(last_backup_date)
    seconds_since_last_backup = @current_ruby_time.to_i - last_backup_ruby_time.to_i
    if seconds_since_last_backup.to_i > @max_number_of_seconds_since_previous_backup_initiated.to_i then
@@ -254,7 +257,7 @@ def check_and_display_last_succesful_backup (path)
        end
    end
    if ( "#{@current_backup_last_succesful_backup_initiation_time_determined_from_log_file.chomp}" == "YES" ) then
-       puts "Previous succesful backup initiated at : #{last_backup_date}"
+       puts "Previous succesful backup initiated : #{last_backup_date}"
        last_succesful_backup_ruby_time = Time.parse(last_backup_date)
        seconds_since_last_backup = @current_ruby_time.to_i - last_succesful_backup_ruby_time.to_i
        if seconds_since_last_backup.to_i > @max_number_of_seconds_since_previous_backup_initiated.to_i then
