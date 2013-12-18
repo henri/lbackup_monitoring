@@ -163,112 +163,112 @@ def report_full_paths (path)
         backup_destination_path = "ERROR! : Unable to determin backup destination path, manual inspection of the configuration file is required."
     end
     # reports some paths (hopefully absolute) for realivent files and direcotries.
-	puts "       Configuration path : #{@config_paths[@line_reference]}"
+    puts "       Configuration path : #{@config_paths[@line_reference]}"
     puts "         Destination path : #{backup_destination_path}"
     puts "                 Log path : #{path}"
 end
 
 
 def check_and_display_last_backup (path)
-   # provides reporting of information regarding the last backup.
-   @current_backup_initiation_time_successfully_determined_from_log_file = "YES"
-   # Scan for three lines (output from this script 'backupscan.rb' has had blank lines removed).
-   last_backup_entry_information = `grep -x -A 3 "##################" "#{path}" | tail -n 1 | cut -c 1-50`
-   if ( last_backup_entry_information.chomp != @configuration_lock_error_message.chomp ) then
-       # The last backup log message is not an error regarding lock files
-       last_backup_date = `grep -x -A 1 "##################" "#{path}" | tail -n 1`
-   else
-       # The last backup log message is an error regarding lock file. 
-       # Attempt to locate the last backup start point which is not an error relating to lock files
-       backup_initiations_parsed_with_grep = `grep -x -A 3 "##################" "#{path}"`
-       backup_initiations = backup_initiations_parsed_with_grep.split(/^-{2}/)
-       # We will sort in reverse and will go with the first one we find as the most recent backup initiation
-       backup_initiations.reverse!
-       current_backup_initiation = 0
-       backup_initiations.each { |backup_initiation|
-           if not backup_initiation.match(/^#{@configuration_lock_error_message}/) then
-               # This backup did not have an associated lock file error so it is the most recent
-               break 
-           end
-           current_backup_initiation += 1
-       }
-       # Locate the last backup date from the current_backup_initiation
-       last_backup_date = `echo "#{backup_initiations[current_backup_initiation]}" | grep -x -A 1 "##################" | tail -n 1`
-       if current_backup_initiation > backup_initiations.length then
-           last_backup_date = "Unable to determine from information within the log file."
-           @current_backup_initiation_time_successfully_determined_from_log_file = "NO"
-       end
-   end
-   puts "Most recent backup initiated : #{last_backup_date}"
-   last_backup_ruby_time = Time.parse(last_backup_date)
-   seconds_since_last_backup = @current_ruby_time.to_i - last_backup_ruby_time.to_i
-   if seconds_since_last_backup.to_i > @max_number_of_seconds_since_previous_backup_initiated.to_i then
-       @backups_not_initiated_within_specified_limit = @backups_not_initiated_within_specified_limit + 1
-       @current_backup_initiation_time_exceeds_specified_limit="YES"
-       mm, ss = seconds_since_last_backup.divmod(60)
-       hh, mm = mm.divmod(60)
-       dd, hh = hh.divmod(24)
-       puts "                      %d days, %d hours, %d minutes ago" % [dd, hh, mm, ss]
-   end
+  # provides reporting of information regarding the last backup.
+  @current_backup_initiation_time_successfully_determined_from_log_file = "YES"
+  # Scan for three lines (output from this script 'backupscan.rb' has had blank lines removed).
+  last_backup_entry_information = `grep -x -A 3 "##################" "#{path}" | tail -n 1 | cut -c 1-50`
+  if ( last_backup_entry_information.chomp != @configuration_lock_error_message.chomp ) then
+    # The last backup log message is not an error regarding lock files
+    last_backup_date = `grep -x -A 1 "##################" "#{path}" | tail -n 1`
+  else
+    # The last backup log message is an error regarding lock file. 
+    # Attempt to locate the last backup start point which is not an error relating to lock files
+    backup_initiations_parsed_with_grep = `grep -x -A 3 "##################" "#{path}"`
+    backup_initiations = backup_initiations_parsed_with_grep.split(/^-{2}/)
+    # We will sort in reverse and will go with the first one we find as the most recent backup initiation
+    backup_initiations.reverse!
+    current_backup_initiation = 0
+    backup_initiations.each { |backup_initiation|
+      if not backup_initiation.match(/^#{@configuration_lock_error_message}/) then
+        # This backup did not have an associated lock file error so it is the most recent
+        break 
+      end
+      current_backup_initiation += 1
+    }
+    # Locate the last backup date from the current_backup_initiation
+    last_backup_date = `echo "#{backup_initiations[current_backup_initiation]}" | grep -x -A 1 "##################" | tail -n 1`
+    if current_backup_initiation > backup_initiations.length then
+      last_backup_date = "Unable to determine from information within the log file."
+      @current_backup_initiation_time_successfully_determined_from_log_file = "NO"
+    end
+  end
+  puts "Most recent backup initiated : #{last_backup_date}"
+  last_backup_ruby_time = Time.parse(last_backup_date)
+  seconds_since_last_backup = @current_ruby_time.to_i - last_backup_ruby_time.to_i
+  if seconds_since_last_backup.to_i > @max_number_of_seconds_since_previous_backup_initiated.to_i then
+    @backups_not_initiated_within_specified_limit = @backups_not_initiated_within_specified_limit + 1
+    @current_backup_initiation_time_exceeds_specified_limit="YES"
+    mm, ss = seconds_since_last_backup.divmod(60)
+    hh, mm = mm.divmod(60)
+    dd, hh = hh.divmod(24)
+    puts "                      %d days, %d hours, %d minutes ago" % [dd, hh, mm, ss]
+  end
 end
 
 
 def check_and_display_last_succesful_backup (path)
-   @current_backup_last_succesful_backup_initiation_time_determined_from_log_file = "YES"
-   @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "NO"
-   # Scan for three lines (output from this script 'backupscan.rb' has had blank lines removed).
-   #last_succesful_backup_entry_information = `cat "#{path}"| sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' | grep -x -A 3 "##################" | tail -n 1 | cut -c 1-50`
-   last_succesful_backup_entry_information = `if [ \`grep -n -e '^Backup Completed Successfully' "#{path}" | wc -l | awk '{print $1}'\` -ge 2 ] ; then linesplit=$(grep -n -e '^Backup Completed Successfully' "#{path}" | cut -d: -f1 | tail -2 | head -1) ; cat "#{path}" | sed -n "$((linesplit+1))"',$p' | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; else cat "#{path}" | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; fi | grep -x -A 3 "##################" | tail -n 1 | cut -c 1-50`
-   if ( last_succesful_backup_entry_information.chomp != @configuration_lock_error_message.chomp ) then
-       # The last backup log message is not an error regarding lock files
-       if ( last_succesful_backup_entry_information.chomp != "" ) then 
-	       last_backup_date = `if [ \`grep -n -e '^Backup Completed Successfully' "#{path}" | wc -l | awk '{print $1}'\` -ge 2 ] ; then linesplit=$(grep -n -e '^Backup Completed Successfully' "#{path}" | cut -d: -f1 | tail -2 | head -1) ; cat "#{path}" | sed -n "$((linesplit+1))"',$p' | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; else cat "#{path}" | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; fi | grep -x -A 1 "##################" | tail -n 1`
-	       if ( "#{last_backup_date.chomp}" == "" ) then
-	           # Unable to find any successful backups. Suspect that there are no successful backups recorded in the log file
-   	           @current_backup_last_succesful_backup_initiation_time_determined_from_log_file = "NO"
-   	           @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "YES"
-	       end
-	   else
-	   	    # Unable to find any successful backups. Suspect that there are no successful backups recorded in the log file
-	       @current_backup_last_succesful_backup_initiation_time_determined_from_log_file = "NO"
-	       @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "YES"
-	   end
-   else
-       # The last backup log message relating to successful backup initiation is an error regarding lock file. 
-       # Attempt to locate the last backup start point which is not an error relating to lock files
-       backup_initiations_parsed_with_grep = `if [ \`grep -n -e '^Backup Completed Successfully' "#{path}" | wc -l | awk '{print $1}'\` -ge 2 ] ; then linesplit=$(grep -n -e '^Backup Completed Successfully' "#{path}" | cut -d: -f1 | tail -2 | head -1) ; cat "#{path}" | sed -n "$((linesplit+1))"',$p' | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; else cat "#{path}" | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; fi | grep -x -A 3 "##################"`
-       backup_initiations = backup_initiations_parsed_with_grep.split(/^-{2}/)
-       # We will sort in reverse and will go with the first one we find as the most recent backup initiation
-       backup_initiations.reverse!
-       current_backup_initiation = 0
-       backup_initiations.each { |backup_initiation|
-           if not backup_initiation.match(/^#{@configuration_lock_error_message}/) then
-               # This backup did not have an associated lock file error so it is the most recent
-               break 
-           end
-           current_backup_initiation += 1
-       }
-       # Locate the last successful backup date from the current_backup_initiation
-       last_backup_date = `echo "#{backup_initiations[current_backup_initiation]}" | grep -x -A 1 "##################" | tail -n 1`
-       if current_backup_initiation > backup_initiations.length then
-           last_backup_date = "Unable to determine from information within the log file."
-           @current_backup_last_succesful_backup_initiation_time_determined_from_log_file = "NO"
-           @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "YES"
-       end
-   end
-   if ( "#{@current_backup_last_succesful_backup_initiation_time_determined_from_log_file.chomp}" == "YES" ) then
-       puts "Previous succesful backup initiated : #{last_backup_date}"
-       last_succesful_backup_ruby_time = Time.parse(last_backup_date)
-       seconds_since_last_backup = @current_ruby_time.to_i - last_succesful_backup_ruby_time.to_i
-       if seconds_since_last_backup.to_i > @max_number_of_seconds_since_previous_backup_initiated.to_i then
-           @succesful_backups_not_initiated_within_specified_limit = @succesful_backups_not_initiated_within_specified_limit + 1
-           @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "YES"
-           mm, ss = seconds_since_last_backup.divmod(60)
-           hh, mm = mm.divmod(60)
-           dd, hh = hh.divmod(24)
-           puts "                                         %d days, %d hours, %d minutes ago" % [dd, hh, mm, ss]
-        end
+  @current_backup_last_succesful_backup_initiation_time_determined_from_log_file = "YES"
+  @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "NO"
+  # Scan for three lines (output from this script 'backupscan.rb' has had blank lines removed).
+  #last_succesful_backup_entry_information = `cat "#{path}"| sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' | grep -x -A 3 "##################" | tail -n 1 | cut -c 1-50`
+  last_succesful_backup_entry_information = `if [ \`grep -n -e '^Backup Completed Successfully' "#{path}" | wc -l | awk '{print $1}'\` -ge 2 ] ; then linesplit=$(grep -n -e '^Backup Completed Successfully' "#{path}" | cut -d: -f1 | tail -2 | head -1) ; cat "#{path}" | sed -n "$((linesplit+1))"',$p' | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; else cat "#{path}" | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; fi | grep -x -A 3 "##################" | tail -n 1 | cut -c 1-50`
+  if ( last_succesful_backup_entry_information.chomp != @configuration_lock_error_message.chomp ) then
+    # The last backup log message is not an error regarding lock files
+    if ( last_succesful_backup_entry_information.chomp != "" ) then 
+      last_backup_date = `if [ \`grep -n -e '^Backup Completed Successfully' "#{path}" | wc -l | awk '{print $1}'\` -ge 2 ] ; then linesplit=$(grep -n -e '^Backup Completed Successfully' "#{path}" | cut -d: -f1 | tail -2 | head -1) ; cat "#{path}" | sed -n "$((linesplit+1))"',$p' | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; else cat "#{path}" | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; fi | grep -x -A 1 "##################" | tail -n 1`
+      if ( "#{last_backup_date.chomp}" == "" ) then
+        # Unable to find any successful backups. Suspect that there are no successful backups recorded in the log file
+   	    @current_backup_last_succesful_backup_initiation_time_determined_from_log_file = "NO"
+   	    @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "YES"
+      end
+    else
+      # Unable to find any successful backups. Suspect that there are no successful backups recorded in the log file
+	    @current_backup_last_succesful_backup_initiation_time_determined_from_log_file = "NO"
+	    @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "YES"
     end
+  else
+    # The last backup log message relating to successful backup initiation is an error regarding lock file. 
+    # Attempt to locate the last backup start point which is not an error relating to lock files
+    backup_initiations_parsed_with_grep = `if [ \`grep -n -e '^Backup Completed Successfully' "#{path}" | wc -l | awk '{print $1}'\` -ge 2 ] ; then linesplit=$(grep -n -e '^Backup Completed Successfully' "#{path}" | cut -d: -f1 | tail -2 | head -1) ; cat "#{path}" | sed -n "$((linesplit+1))"',$p' | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; else cat "#{path}" | sed -n '1!G;h;$p' | sed -n '/^Backup Completed Successfully/,$p' | sed -n '1!G;h;$p' ; fi | grep -x -A 3 "##################"`
+    backup_initiations = backup_initiations_parsed_with_grep.split(/^-{2}/)
+    # We will sort in reverse and will go with the first one we find as the most recent backup initiation
+    backup_initiations.reverse!
+    current_backup_initiation = 0
+    backup_initiations.each { |backup_initiation|
+      if not backup_initiation.match(/^#{@configuration_lock_error_message}/) then
+        # This backup did not have an associated lock file error so it is the most recent
+        break 
+      end
+      current_backup_initiation += 1
+    }
+    # Locate the last successful backup date from the current_backup_initiation
+    last_backup_date = `echo "#{backup_initiations[current_backup_initiation]}" | grep -x -A 1 "##################" | tail -n 1`
+    if current_backup_initiation > backup_initiations.length then
+      last_backup_date = "Unable to determine from information within the log file."
+      @current_backup_last_succesful_backup_initiation_time_determined_from_log_file = "NO"
+      @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "YES"
+    end
+  end
+  if ( "#{@current_backup_last_succesful_backup_initiation_time_determined_from_log_file.chomp}" == "YES" ) then
+    puts "Previous succesful backup initiated : #{last_backup_date}"
+    last_succesful_backup_ruby_time = Time.parse(last_backup_date)
+    seconds_since_last_backup = @current_ruby_time.to_i - last_succesful_backup_ruby_time.to_i
+    if seconds_since_last_backup.to_i > @max_number_of_seconds_since_previous_backup_initiated.to_i then
+      @succesful_backups_not_initiated_within_specified_limit = @succesful_backups_not_initiated_within_specified_limit + 1
+      @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "YES"
+      mm, ss = seconds_since_last_backup.divmod(60)
+      hh, mm = mm.divmod(60)
+      dd, hh = hh.divmod(24)
+      puts "                                         %d days, %d hours, %d minutes ago" % [dd, hh, mm, ss]
+    end
+  end
 end
 
 
@@ -348,86 +348,86 @@ end
 
 
 log_paths.each do |p|
-    unless p.match(/^\s*(#.*)?$/) # Do not deal with lines that commented out or blank
-        @most_resent_backup_completed_sucssfully == "NO"
-        puts "=" * 72
-        puts "Inspecting most recent backup log #{File.basename(p)}"
-        lines = `tail -n 50 #{p}`.strip.split(/\r|\n/).delete_if {|l| l.length == 0 } 
-        if lines.size == 0
-			      report_full_paths(p)
-            if File.readable?(p) then 
-                puts "WARNING! : Backup log is empty."
-            else
-                puts "WARNING! : Backup log is unable to be opened for examination."
-            end
-            logs_with_errors+=1
-        elsif lines[-1].match /Backup Completed Successfully/
-            @most_resent_backup_completed_sucssfully = "YES" # although not necessarily within the specified duration limits.
-	        check_log_for_last_succesful_backup_duration_entry(lines)
-            check_and_display_last_backup(p)
-            if ( "#{@current_backup_initiation_time_exceeds_specified_limit}" == "YES" ) then
-                puts "Backup appears to be successful. However, last backup was started to long ago."
-                # This next line will incriment the error count when the backup initiation time limit is exceeded.
-                logs_with_errors+=1
-            elsif ( "#{@current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit}" == "YES" ) then
-                # If the backup was started too long ago this is not going to be reported due to the else. One error is enough to flag up a problem at this point.
-            	puts "Backup appears to be successful. However, last succesfull backup was started to long ago."
-                # This next line will incriment the error count when the backup initiation time limit is exceeded.
-                logs_with_errors+=1
-            else
-                # If the backup was started too long ago this is not going to be reported due to the else. One error is enough to flag up a problem at this point.
-                if @current_backup_duration_exceeds_specified_limit.to_s == "YES" then
-                  if @current_backup_duration_successfully_determined == "NO" then
-     				  puts "#{@current_backup_duration_unable_to_detemrin_duration_message}"
-     				  puts "Backup appears to be successful." 
-                  else
-                      puts "#{@current_backup_duration_exceeded_message}"
-                  end
-                  # This next line will increment the error count when the backup duration time limit is exceeded.
-                  logs_with_errors+=1
-                else
-                  puts "Backup appears to be successful." 
-                end
-            end
+  unless p.match(/^\s*(#.*)?$/) # Do not deal with lines that commented out or blank
+    @most_resent_backup_completed_sucssfully == "NO"
+    puts "=" * 72
+    puts "Inspecting most recent backup log #{File.basename(p)}"
+    lines = `tail -n 50 #{p}`.strip.split(/\r|\n/).delete_if {|l| l.length == 0 } 
+    if lines.size == 0
+      report_full_paths(p)
+      if File.readable?(p) then 
+        puts "WARNING! : Backup log is empty."
+      else
+        puts "WARNING! : Backup log is unable to be opened for examination."
+      end
+      logs_with_errors+=1
+    elsif lines[-1].match /Backup Completed Successfully/
+      @most_resent_backup_completed_sucssfully = "YES" # although not necessarily within the specified duration limits.
+	    check_log_for_last_succesful_backup_duration_entry(lines)
+      check_and_display_last_backup(p)
+      if ( "#{@current_backup_initiation_time_exceeds_specified_limit}" == "YES" ) then
+        puts "Backup appears to be successful. However, last backup was started to long ago."
+        # This next line will incriment the error count when the backup initiation time limit is exceeded.
+        logs_with_errors+=1
+      elsif ( "#{@current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit}" == "YES" ) then
+        # If the backup was started too long ago this is not going to be reported due to the else. One error is enough to flag up a problem at this point.
+        puts "Backup appears to be successful. However, last succesfull backup was started to long ago."
+        # This next line will incriment the error count when the backup initiation time limit is exceeded.
+        logs_with_errors+=1
+      else
+        # If the backup was started too long ago this is not going to be reported due to the else. One error is enough to flag up a problem at this point.
+        if @current_backup_duration_exceeds_specified_limit.to_s == "YES" then
+          if @current_backup_duration_successfully_determined == "NO" then
+     			  puts "#{@current_backup_duration_unable_to_detemrin_duration_message}"
+     				puts "Backup appears to be successful." 
+          else
+            puts "#{@current_backup_duration_exceeded_message}"
+          end
+          # This next line will increment the error count when the backup duration time limit is exceeded.
+          logs_with_errors+=1
         else
-			report_full_paths(p)
+          puts "Backup appears to be successful." 
+        end
+      end
+    else
+      report_full_paths(p)
 			# add a check to find the last initiation of a successful backup.... done and have commented out the checks for last display and check of backup. 
-            check_and_display_last_succesful_backup(p)
-            check_and_display_last_backup(p)
-            log_path_parent_dir = File.dirname(p)
-            absolute_path_to_backup_lock_file = log_path_parent_dir + "/" + backup_lock_file_name
-            rsync_is_running = %x{ps -A | grep lbackup | grep "#{@config_paths[@line_reference]}" | grep -v \"grep\" | wc -l | awk '{print $1}'}
-            if ( ( File.exist?(absolute_path_to_backup_lock_file) ) && ( rsync_is_running != 0 ) ) then
-                check_in_progress_backup_duration(absolute_path_to_backup_lock_file)
-                if @current_backup_duration_exceeds_specified_limit.to_s == "YES" then
-                  if @current_backup_duration_successfully_determined == "NO" then
-     				  puts "#{@current_backup_duration_unable_to_detemrin_duration_message}"
-                  else
-                      puts "#{@current_backup_duration_exceeded_message}"
-                  end
-                  logs_with_errors+=1
-                elsif ( "#{@current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit}" == "YES" ) then
-                    # As this backup is in progress without exceeding any limits we will now check to see if there is a previous successful backup and if it is within initiation limits.
-                	# If the backup was started too long ago this is not going to be reported due to the else. One error is enough to flag up a problem at this point.
-            		puts "Last succesfull backup was started to long ago."
-                	# This next line will incriment the error count when the successful backup initiation time limit is exceeded.
-                	logs_with_errors+=1
-                end
-                puts "Backup appears to be in progress."
-                backups_in_progess+=1
-             else
-             	# Just a single error will be reported in this situation. Enough to flag a problem with the backup.
-                puts "Backup log indicates errors : "
-                lines.each { |l| puts "\t#{l}" }
-                logs_with_errors+=1
-             end
-         end
-         logs_checked+=1
+      check_and_display_last_succesful_backup(p)
+      check_and_display_last_backup(p)
+      log_path_parent_dir = File.dirname(p)
+      absolute_path_to_backup_lock_file = log_path_parent_dir + "/" + backup_lock_file_name
+      rsync_is_running = %x{ps -A | grep lbackup | grep "#{@config_paths[@line_reference]}" | grep -v \"grep\" | wc -l | awk '{print $1}'}
+      if ( ( File.exist?(absolute_path_to_backup_lock_file) ) && ( rsync_is_running != 0 ) ) then
+        check_in_progress_backup_duration(absolute_path_to_backup_lock_file)
+        if @current_backup_duration_exceeds_specified_limit.to_s == "YES" then
+          if @current_backup_duration_successfully_determined == "NO" then
+            puts "#{@current_backup_duration_unable_to_detemrin_duration_message}"
+          else
+            puts "#{@current_backup_duration_exceeded_message}"
+          end
+          logs_with_errors+=1
+        elsif ( "#{@current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit}" == "YES" ) then
+          # As this backup is in progress without exceeding any limits we will now check to see if there is a previous successful backup and if it is within initiation limits.
+          # If the backup was started too long ago this is not going to be reported due to the else. One error is enough to flag up a problem at this point.
+          puts "Last succesfull backup was started to long ago."
+          # This next line will incriment the error count when the successful backup initiation time limit is exceeded.
+          logs_with_errors+=1
+        end
+        puts "Backup appears to be in progress."
+        backups_in_progess+=1
+      else
+        # Just a single error will be reported in this situation. Enough to flag a problem with the backup.
+        puts "Backup log indicates errors : "
+        lines.each { |l| puts "\t#{l}" }
+        logs_with_errors+=1
+        end
+      end
+      logs_checked+=1
     end
     @current_backup_initiation_time_exceeds_specified_limit = "NO"
     @current_backup_duration_exceeds_specified_limit = "NO"
     @current_backup_last_succesful_backup_initiation_time_exceeds_specified_limit = "NO"
-	@line_reference+=1
+    @line_reference+=1
 end
 
 puts ""
