@@ -12,7 +12,7 @@
 # Written by Samuel Williams and Henri Shustak
 # 
 
-# Version 2.2
+# Version 2.3
 
 
 
@@ -64,6 +64,7 @@
 # v2.0 include the count of backups exceeding limits within the error count.
 # v2.1 includes checks which work with LBackup 0.9.8r5 and later for checking the backup duration is within specified limits.
 # v2.2 includes checks which confirm that the initiation time of the most recent successful backup (assuming one exists) is within specified initiated limits.
+# v2.3 minor improvements to reporting.
 
 require 'fileutils'
 require 'optparse'
@@ -195,7 +196,7 @@ def check_and_display_last_backup (path)
            @current_backup_initiation_time_successfully_determined_from_log_file = "NO"
        end
    end
-   puts "Backup initiated at : #{last_backup_date}"
+   puts "Most recent backup initiated at : #{last_backup_date}"
    last_backup_ruby_time = Time.parse(last_backup_date)
    seconds_since_last_backup = @current_ruby_time.to_i - last_backup_ruby_time.to_i
    if seconds_since_last_backup.to_i > @max_number_of_seconds_since_previous_backup_initiated.to_i then
@@ -388,8 +389,8 @@ log_paths.each do |p|
         else
 			report_full_paths(p)
 			# add a check to find the last initiation of a successful backup.... done and have commented out the checks for last display and check of backup. 
-            # check_and_display_last_backup(p)
             check_and_display_last_succesful_backup(p)
+            check_and_display_last_backup(p)
             log_path_parent_dir = File.dirname(p)
             absolute_path_to_backup_lock_file = log_path_parent_dir + "/" + backup_lock_file_name
             rsync_is_running = %x{ps -A | grep lbackup | grep "#{@config_paths[@line_reference]}" | grep -v \"grep\" | wc -l | awk '{print $1}'}
