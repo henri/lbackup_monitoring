@@ -32,7 +32,7 @@
 # 1.1 : Minor Bug Fixes (Improved parsing of the crontab)
 # 1.2 : Major Bug Fixes (Actually reads something out of the crontab)
 # 1.3 : Supports writting a second file to disk with a list of the paths to the configuration files (as specified within the crontab).
-
+# 1.3 : Compatibilty fixes providing support for latest versions of ruby.
 
 require "fileutils"
 require 'optparse'
@@ -54,11 +54,12 @@ ARGV.options do |o|
   o.banner = "Usage: #{script_name} [options]"
   o.define_head "This script is used to build a file containg paths to backup logs."
   
-  o.on("-l log_list", "Output file with list of paths to backup logs") { |OPTIONS[:log_list]| }
-  o.on("-c config_list", "Output file with list of paths to backup configurations") { |OPTIONS[:config_list]| }
+  o.on("-l log_list", "--loglist config_list", "Output file with list of paths to backup logs") { |op| OPTIONS[:log_list] = op }
+  o.on("-c config_list", "--conflist config_list", "Output file with list of paths to backup configurations") { |op| OPTIONS[:config_list] = op }
   
   o
 end.parse!
+
 
 # Pull in the lbackup configuration paths from the crontab
 config_paths = IO.popen("crontab -l | grep -v -e \"^#\" | grep -w \"/usr/local/sbin/lbackup\" | awk -F \"/usr/local/sbin/lbackup \" '{print $2}'") do |io|
