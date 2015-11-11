@@ -12,7 +12,7 @@
 # Written by Samuel Williams and Henri Shustak
 # 
 
-# Version 2.3
+# Version 2.4
 
 
 
@@ -68,6 +68,7 @@
 # v2.1 includes checks which work with LBackup 0.9.8r5 and later for checking the backup duration is within specified limits.
 # v2.2 includes checks which confirm that the initiation time of the most recent successful backup (assuming one exists) is within specified initiated limits.
 # v2.3 minor improvements to reporting.
+# v2.4 compatibilty fixes providing support for latest versions of ruby.
 
 require 'fileutils'
 require 'optparse'
@@ -85,11 +86,17 @@ ARGV.options do |o|
   o.banner = "Usage: #{script_name} [options]"
   o.define_head "This script is used to aggregate log information."
   
-  o.on("-l log_list", "File containing a list of paths to backup log files") { |OPTIONS[:log_list]| }
-  o.on("-c config_list", "File containg a list of paths to backup configuration files") { |OPTIONS[:config_list]| }
+  o.on("-l log_list", "--loglist log_list", "File containing a list of paths to backup log files") do |op| 
+    OPTIONS[:log_list] = op
+  end
+  
+  o.on("-c config_list", "--configlist config_list", "File containg a list of paths to backup configuration files") do |op|
+    OPTIONS[:config_list] = op
+  end
   
   o
 end.parse!
+
 
 # load the input lists
 begin
@@ -107,6 +114,7 @@ rescue => msg
   puts "             from the following URL : http://www.lbackup.org/monitoring_multiple_backup_logs"
   exit -1
 end
+
 
 # check these lists are the same length
 if log_paths.length != @config_paths.length then
@@ -459,4 +467,3 @@ end
 puts "=" * 72
 puts ""
 puts ""
-
